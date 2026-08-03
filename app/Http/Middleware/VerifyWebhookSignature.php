@@ -18,6 +18,7 @@ class VerifyWebhookSignature
         $signature = $request->header('X-Webhook-Signature');
 
         // In a real app, i will place this in  store this in .env or config('services.provider.webhook_secret')
+        //this webhook os a simulation
         $secret = 'my-webhook-secret-key';
 
         // Hash the raw request body payload

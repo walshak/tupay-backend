@@ -60,7 +60,7 @@ class ProcessSettlementWebhook implements ShouldQueue
                     $settlement->update(['status' => $newStatus]);
                 }
 
-                // If it just became COMPLETED, we must credit the user's ledger!
+                // If it just became COMPLETED, we must credit the user's ledger
                 if ($newStatus === 'COMPLETED') {
 
                     // We must check if we already credited this to prevent double-crediting.
@@ -68,9 +68,7 @@ class ProcessSettlementWebhook implements ShouldQueue
                     $exists = LedgerEntry::where('transaction_reference', $reference)->exists();
 
                     if (!$exists) {
-                        // Double-Entry logic: 
-                        // Note: For a true balanced system, we need a "System Master Wallet" (ID 1)
-                        // to debit from, while crediting the user's wallet.
+                        // Double-Entry logic
                         $systemWalletId = 1;
 
                         LedgerEntry::create([

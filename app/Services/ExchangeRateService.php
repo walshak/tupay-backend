@@ -34,7 +34,7 @@ class ExchangeRateService
         if (!$response->successful()) {
             throw new \RuntimeException("Failed to fetch exchange rates.");
         }
-        $rateFloat = $response->json("rates.{$to}"); // get the specific rate for the target currency CNY
+        $rateFloat = $response->json("rates.{$to}"); // get the specific rate for the target currency CNY or NGN
         if (!$rateFloat) {
             throw new \RuntimeException("Currency {$to} not supported by the provider.");
         }

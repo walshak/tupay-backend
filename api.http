@@ -21,7 +21,7 @@ Accept: application/json
 Authorization: Bearer {{token}}
 
 {
-    "totp_code": "285286",
+    "totp_code": "967972",
     "action_payload": {
         "source_wallet_id": 3,
         "dest_wallet_id": 4,
@@ -48,7 +48,8 @@ Accept: application/json
 Authorization: Bearer {{token}}
 
 ### 5. Settlement Webhook
-# NOTE: The signature below is pre-computed for this EXACT minified payload using the secret 'my-webhook-secret-key'. Do not add spaces or newlines to the JSON body!
+# NOTE: The signature below is pre-computed for this EXACT minified payload using the secret that i set in the midllewar
+# (my-webhook-secret-key). Do not add spaces or newlines to the JSON body
 POST {{baseUrl}}/webhooks/settlement
 Content-Type: application/json
 Accept: application/json

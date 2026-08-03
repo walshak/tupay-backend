@@ -124,7 +124,7 @@ php artisan test --filter SwapConcurrencyTest
 To prove the rigorous strict typing and architectural compliance of the codebase, I have integrated **Larastan** (PHPStan for Laravel) configured to **Level 8**. Run the static analysis by executing:
 
 ```bash
-./vendor/bin/phpstan analyse --memory-limit=2G --level=8
+./vendor/bin/phpstan analyse app --memory-limit=2G --level=8
 ```
 
 ---

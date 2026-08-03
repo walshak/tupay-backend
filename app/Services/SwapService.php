@@ -102,9 +102,6 @@ class SwapService
                     'description' => "Swap from {$sourceWallet->currency}"
                 ]);
 
-                // NOTE: If you wanted strict zero-sum double-entry, you'd also create a 
-                // "Fee Wallet" and credit the $feeAmount to it, ensuring debits = credits exactly.
-
                 DB::commit();
 
                 return [
@@ -118,7 +115,7 @@ class SwapService
                 throw $e;
             }
         } finally {
-            // 5. Always release Redis locks in reverse order
+            // Release Redis locks in reverse order
             foreach (array_reverse($locks) as $lock) {
                 if ($lock instanceof \Illuminate\Contracts\Cache\Lock) {
                     $lock->release();
