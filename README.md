@@ -1,66 +1,129 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Tupay Backend Engine
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This repository contains a production-ready, high-performance financial swap engine built with Laravel 10.
 
-## About Laravel
+Here is a breakdown of how I solved the challenges and met every requirement of the assessment.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Architectural Decisions & Solutions
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 1. The Step-Up Security Pattern (Action-Hashed 2FA)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+I wanted to ensure that even if an attacker intercepts a TOTP code, they can't use it to drain a wallet.
 
-## Learning Laravel
+- **The Hashing Mechanism:** When a user passes the 2FA challenge, I don't just give them a generic token. I take their exact intended action (e.g., swapping 150M kobo from Wallet A to B) and hash it using `hash('sha256', json_encode($action_payload))`.
+- **The Elevated Action Token (EAT):** I generate an EAT and store it in Redis with a strict 60-second TTL. The Redis key binds the token to that exact payload hash. If the user changes even one kobo in their request, the hash changes, and the token becomes instantly invalid.
+- **Atomic Invalidation:** To prevent replay attacks, the `VerifyElevatedActionToken` middleware uses a custom **Redis LUA Script** to read and delete the token in one atomic swoop. Even if a bot fires 1,000 identical requests at the exact same millisecond, Redis guarantees that exactly _one_ request gets the token, and the other 999 are rejected with a `401 Unauthorized`.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 2. Deadlock Prevention & The Swap Engine
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+When two people try to swap money at the same time, database locks can easily collide and cause a distributed deadlock.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Lexicographical Lock Ordering:** Before I even touch the database, I gather the User ID and both Wallet IDs, and I sort them alphabetically. By ensuring every server acquires Redis locks in the exact same deterministic order, deadlocks are mathematically impossible.
+- **The Lock Sequence:**
+    1. Acquire the sorted Redis locks (blocking for up to 5 seconds).
+    2. Open a MySQL transaction with the `REPEATABLE READ` isolation level.
+    3. Apply a pessimistic row-level lock (`SELECT ... FOR UPDATE`) on the specific wallets.
+    4. Perform the balance checks and ledger inserts.
+    5. Safely release the Redis locks inside a `finally` block.
+- **Dynamic Slippage & Math:** I used `bcmath` for all internal calculations to ensure absolute subunit precision. I apply the dynamic tiered slippage fee (0.5% base + 0.1% per additional 500k NGN) and use Banker's Rounding (`PHP_ROUND_HALF_EVEN`) to safely convert back to integers.
 
-## Laravel Sponsors
+### 3. The Pure Double-Entry Ledger
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+I treat the database as the absolute ultimate source of truth.
 
-### Premium Partners
+- **Zero-Sum Ledger:** Every transaction creates two paired `ledger_entries` (a Debit and a Credit). The system is perfectly balanced; money is never created or destroyed, only moved.
+- **No Static Balances:** The `wallets` table does not have a hardcoded `balance` column. Balances are derived dynamically from the ledger entries.
+- **Deep-Storage Guardrails:** I added a MySQL `BEFORE INSERT` trigger directly to the database. Even if someone manages to bypass the PHP codebase entirely, the database itself will abort any transaction that would push a wallet's total below zero.
+- **Indexing Rationale:** To ensure the `GET /api/ledger/{wallet_id}` endpoint remains lightning-fast even with millions of records, I added a composite index on `(wallet_id, created_at DESC)`. This allows the database to skip full table scans and instantly paginate a user's chronological history in $O(\log n)$ time.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### 4. Idempotent Settlement Webhooks
 
-## Contributing
+- **Security:** Incoming webhooks are protected by HMAC-SHA256 signature middleware.
+- **Resiliency:** Payment providers aren't always perfect. If a `COMPLETED` webhook arrives _before_ an `INITIATED` webhook in the hypothical scenerio i made up, our state machine gracefully handles the out-of-order delivery without corrupting the ledger.
+- **Performance:** Heavy webhook processing is offloaded to Redis Queue workers so the API can respond to the provider immediately.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Getting Started
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+To spin up the engine, follow these steps:
 
-## Security Vulnerabilities
+### 1. Prerequisites
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- PHP 8.2+ with the `php-bcmath` extension installed (`sudo apt install php-bcmath`).
+- A local Redis server running on the default port.
+- `predis/predis` (installed via Composer) configured as the Laravel Redis client (`REDIS_CLIENT=predis`).
+- MySQL or PostgreSQL.
 
-## License
+### 2. Setup
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+# Install dependencies
+composer install
+
+# Set up your environment variables
+cp .env.example .env
+php artisan key:generate
+```
+
+Then, open your `.env` file and ensure the following core variables are set:
+
+```env
+DB_CONNECTION=mysql
+# Add your DB_DATABASE, DB_USERNAME, DB_PASSWORD...
+
+CACHE_DRIVER=redis
+QUEUE_CONNECTION=redis
+SESSION_DRIVER=redis
+REDIS_CLIENT=predis
+```
+
+### 3. Seed the Database
+
+This command will migrate the tables, create the database triggers, and generate a test user with a System Master wallet.
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+### 4. Run the Engine
+
+To simulate the full production environment, open two terminal tabs:
+
+```bash
+# Tab 1: Start the API server
+php artisan serve
+
+# Tab 2: Start the asynchronous queue worker (Handles webhooks & SWR cache)
+php artisan queue:work
+```
+
+---
+
+## Testing the Application
+
+I've made it as easy as possible for you to evaluate the API!
+
+**1. The `api.http` File (VS Code REST Client)**
+Open the `api.http` file in the root of the project. If you have the "REST Client" extension installed in VS Code, you can click "Send Request" to walk through the entire flow (Login -> 2FA Challenge -> Swap -> Ledger -> Webhook) without needing to manually copy/paste tokens.
+
+**Important: The 2FA Challenge Step**
+To successfully execute the `2fa/challenge` request in `api.http`, you must supply a valid 6-digit TOTP code:
+
+1. When you run `php artisan migrate:fresh --seed`, the console will print a **TOTP Secret** for the test user.
+2. Enter this secret into your **Google Authenticator** app, or use an online generator like [totp.app](https://totp.app/).
+3. Copy the live 6-digit code.
+4. Paste it into the `api.http` file under the 2FA Challenge request by replacing the `"totp_code"` value, and immediately hit "Send Request".
+
+**2. The Parallel Concurrency Stress Test**
+I wrote a specialized integration test that fires 10 simultaneous POST requests to the Swap API to prove that our Redis LUA script and Pessimistic Locks completely prevent race conditions. To watch it in action, make sure `php artisan serve` is running, then run:
+
+```bash
+php artisan test --filter SwapConcurrencyTest
+```
+
+I look forward to your feedback on my solution!
+
+---
+
+> **Disclosure:** I used AI tools to assist in researching standard integrations for TOTP authentication, exploring the Redis LUA script trick for mitigating distributed race conditions, and formatting some of the inline comments. This readme is also partly ai generated, expanded from my original draft.

@@ -1,0 +1,57 @@
+@baseUrl = http://127.0.0.1:8000/api
+@token = {{login.response.body.access_token}}
+@eat = {{challenge.response.body.elevated_action_token}}
+
+### 1. Login (Get Bearer Token)
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/json
+Accept: application/json
+
+{
+    "email": "walshak1999@gmail.com",
+    "password": "12345678"
+}
+
+### 2. Step-Up 2FA Challenge (Get EAT Token)
+# @name challenge
+POST {{baseUrl}}/2fa/challenge
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{token}}
+
+{
+    "totp_code": "285286",
+    "action_payload": {
+        "source_wallet_id": 3,
+        "dest_wallet_id": 4,
+        "amount_kobo": 150000000
+    }
+}
+
+### 3. Execute Currency Swap
+POST {{baseUrl}}/swap
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{token}}
+X-Elevated-Action-Token: {{eat}}
+
+{
+    "source_wallet_id": 3,
+    "dest_wallet_id": 4,
+    "amount_kobo": 150000000
+}
+
+### 4. View Ledger History (Double-Entry Log)
+GET {{baseUrl}}/ledger/3
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### 5. Settlement Webhook
+# NOTE: The signature below is pre-computed for this EXACT minified payload using the secret 'my-webhook-secret-key'. Do not add spaces or newlines to the JSON body!
+POST {{baseUrl}}/webhooks/settlement
+Content-Type: application/json
+Accept: application/json
+X-Webhook-Signature: f1202252e5e156640f8f2841fde8f296eb805ef590908e5a60402841023dc307
+
+{"provider_reference": "EXT-999", "wallet_id": 3, "amount": 25000000, "status": "COMPLETED"}
