@@ -8,12 +8,15 @@ use Illuminate\Http\Request;
 
 class LedgerController extends Controller
 {
-    public function index(Request $request, string $wallet_id)
+    public function index(Request $request, string $wallet_id): \Illuminate\Http\JsonResponse
     {
         $wallet = Wallet::findOrFail($wallet_id);
 
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
         // Security check: Only the wallet owner can view their ledger
-        if ($wallet->user_id !== $request->user()->id) {
+        if ($wallet->user_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized access to wallet.'], 403);
         }
 

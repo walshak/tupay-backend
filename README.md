@@ -100,9 +100,7 @@ php artisan queue:work
 
 ---
 
-## Testing the Application
-
-I've made it as easy as possible for you to evaluate the API!
+## Testing the system
 
 **1. The `api.http` File (VS Code REST Client)**
 Open the `api.http` file in the root of the project. If you have the "REST Client" extension installed in VS Code, you can click "Send Request" to walk through the entire flow (Login -> 2FA Challenge -> Swap -> Ledger -> Webhook) without needing to manually copy/paste tokens.
@@ -122,7 +120,12 @@ I wrote a specialized integration test that fires 10 simultaneous POST requests 
 php artisan test --filter SwapConcurrencyTest
 ```
 
-I look forward to your feedback on my solution!
+**3. Static Analysis (PHPStan & Larastan)**
+To prove the rigorous strict typing and architectural compliance of the codebase, I have integrated **Larastan** (PHPStan for Laravel) configured to an extremely strict **Level 8**. You can verify the static analysis by running:
+
+```bash
+./vendor/bin/phpstan analyse --memory-limit=2G
+```
 
 ---
 

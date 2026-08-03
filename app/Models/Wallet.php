@@ -7,11 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
+/**
+ * @property int $balance
+ */
 class Wallet extends Model
 {
     use HasFactory;
 
     protected $guarded = [];
+    /**
+     * @return HasMany<LedgerEntry>
+     */
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(LedgerEntry::class);
@@ -19,6 +25,7 @@ class Wallet extends Model
     /**
      * we calculate  balance on the fly using an indexed sql sum 
      * Accessible via $wallet->balance
+     * @return Attribute<int, never>
      */
     protected function balance(): Attribute
     {
