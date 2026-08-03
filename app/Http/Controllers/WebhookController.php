@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 class WebhookController extends Controller
 {
-    public function handle(Request $request)
+    public function handle(Request $request): \Illuminate\Http\JsonResponse
     {
         //let redis take charge of heavy processing in Redis Queue
         ProcessSettlementWebhook::dispatch($request->all());

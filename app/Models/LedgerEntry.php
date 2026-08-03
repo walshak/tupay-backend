@@ -11,10 +11,13 @@ class LedgerEntry extends Model
     use HasFactory;
 
     protected $guarded = [];
-    // ensure that amount is always an integer in response body
+    /** @var array<string, string> */
     protected $casts = [
         'amount' => 'integer',
     ];
+    /**
+     * @return BelongsTo<Wallet, LedgerEntry>
+     */
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(Wallet::class);

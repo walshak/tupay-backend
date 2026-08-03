@@ -13,7 +13,10 @@ class SwapService
 {
     public function __construct(private ExchangeRateService $rateService) {}
 
-    public function executeSwap(int $userId, int $sourceWalletId, int $destWalletId, string $amountKobo)
+    /**
+     * @return array<string, mixed>
+     */
+    public function executeSwap(int $userId, int $sourceWalletId, int $destWalletId, string $amountKobo): array
     {
         // 1. Sort locks alphabetically to guarantee deadlock prevention across servers
         $lockKeys = [
@@ -44,8 +47,12 @@ class SwapService
                     ->get()
                     ->keyBy('id');
 
-                $sourceWallet = $wallets[$sourceWalletId];
-                $destWallet = $wallets[$destWalletId];
+                $sourceWallet = $wallets[$sourceWalletId] ?? null;
+                $destWallet = $wallets[$destWalletId] ?? null;
+
+                if (!$sourceWallet || !$destWallet) {
+                    throw new RuntimeException("One or both wallets not found.");
+                }
 
                 // Ensure user actually owns these wallets
                 if ($sourceWallet->user_id !== $userId || $destWallet->user_id !== $userId) {
@@ -113,7 +120,9 @@ class SwapService
         } finally {
             // 5. Always release Redis locks in reverse order
             foreach (array_reverse($locks) as $lock) {
-                $lock?->release();
+                if ($lock instanceof \Illuminate\Contracts\Cache\Lock) {
+                    $lock->release();
+                }
             }
         }
     }

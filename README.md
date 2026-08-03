@@ -121,10 +121,10 @@ php artisan test --filter SwapConcurrencyTest
 ```
 
 **3. Static Analysis (PHPStan & Larastan)**
-To prove the rigorous strict typing and architectural compliance of the codebase, I have integrated **Larastan** (PHPStan for Laravel) configured to an extremely strict **Level 8**. You can verify the static analysis by running:
+To prove the rigorous strict typing and architectural compliance of the codebase, I have integrated **Larastan** (PHPStan for Laravel) configured to **Level 8**. Run the static analysis by executing:
 
 ```bash
-./vendor/bin/phpstan analyse --memory-limit=2G
+./vendor/bin/phpstan analyse --memory-limit=2G --level=8
 ```
 
 ---

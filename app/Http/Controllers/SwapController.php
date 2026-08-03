@@ -9,7 +9,7 @@ class SwapController extends Controller
 {
     public function __construct(private SwapService $swapService) {}
 
-    public function execute(Request $request)
+    public function execute(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'source_wallet_id' => 'required|integer',
@@ -18,8 +18,11 @@ class SwapController extends Controller
         ]);
 
         try {
+            /** @var \App\Models\User $user */
+            $user = $request->user();
+
             $result = $this->swapService->executeSwap(
-                $request->user()->id,
+                $user->id,
                 $request->source_wallet_id,
                 $request->dest_wallet_id,
                 (string) $request->amount_kobo // Pass as string for BCMath

@@ -9,9 +9,7 @@ parameters:
     # Level 9 is the highest level
     level: 8
 
-    ignoreErrors:
-        # Ignore response()->json() errors as they are too strict for basic controller returns
-        - '#Call to an undefined method Illuminate\\Contracts\\Routing\\ResponseFactory\|Illuminate\\Http\\Response::json\(\)#'
+
 
     excludePaths:
         - ./*/*/FileToBeExcluded.php

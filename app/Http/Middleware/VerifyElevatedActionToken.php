@@ -12,8 +12,8 @@ class VerifyElevatedActionToken
     public function handle(Request $request, Closure $next): Response
     {
         $eatToken = $request->header('X-Elevated-Action-Token');
-        if (!$eatToken) {
-            return response()->json(['message' => 'Missing X-Elevated-Action-Token header'], 401);
+        if (!is_string($eatToken)) {
+            return response()->json(['message' => 'Missing or invalid X-Elevated-Action-Token header'], 401);
         }
         //atomically get and delete the token in Redis to prevent replay attacks
         //a simple Lua script to guarantee atomicity 
@@ -25,6 +25,7 @@ class VerifyElevatedActionToken
             end
             return val
         LUA;
+        /** @phpstan-ignore-next-line (PHPStan expects PHPRedis signature, but we use Predis) */
         $storedHash = Redis::eval($lua, 1, "eat:{$eatToken}");
         if (!$storedHash) {
             return response()->json(['message' => 'Invalid or expired Elevated Action Token'], 401);
@@ -32,7 +33,7 @@ class VerifyElevatedActionToken
         //remake the hash from the current request payload
         $payload = $request->all();
         ksort($payload);
-        $currentHash = hash('sha256', json_encode($payload));
+        $currentHash = hash('sha256', json_encode($payload) ?: '');
         //compare the hashes to ensure the payload hasn't been tampered with
         if (!hash_equals($storedHash, $currentHash)) {
             return response()->json(['message' => 'Payload tampering detected. Action hash mismatch.'], 422);

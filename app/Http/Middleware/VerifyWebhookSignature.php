@@ -13,7 +13,7 @@ class VerifyWebhookSignature
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         $signature = $request->header('X-Webhook-Signature');
 
@@ -23,7 +23,7 @@ class VerifyWebhookSignature
         // Hash the raw request body payload
         $computedSignature = hash_hmac('sha256', $request->getContent(), $secret);
 
-        if (!hash_equals($computedSignature, $signature ?? '')) {
+        if (!is_string($signature) || !hash_equals($computedSignature, $signature)) {
             return response()->json(['message' => 'Invalid signature'], 401);
         }
         return $next($request);
