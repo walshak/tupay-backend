@@ -53,7 +53,7 @@ To spin up the engine, follow these steps:
 - PHP 8.2+ with the `php-bcmath` extension installed (`sudo apt install php-bcmath`).
 - A local Redis server running on the default port.
 - `predis/predis` (installed via Composer) configured as the Laravel Redis client (`REDIS_CLIENT=predis`).
-- MySQL or PostgreSQL.
+- MySQL 8.0+
 
 ### 2. Setup
 
