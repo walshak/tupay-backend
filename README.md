@@ -58,7 +58,13 @@ To spin up the engine, follow these steps:
 ### 2. Setup
 
 ```bash
-# Install dependencies
+#clone repo
+git clone https://github.com/walshak/tupay-backend
+
+#cd into repo
+cd tupay-backend
+
+# Install dependencies`
 composer install
 
 # Set up your environment variables
