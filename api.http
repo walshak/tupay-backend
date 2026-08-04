@@ -13,7 +13,7 @@ Accept: application/json
     "password": "12345678"
 }
 
-### 2. Step-Up 2FA Challenge (Get EAT Token)
+### 2. Step-Up 2FA Challenge (Get EAT Token), the totp_code comes from your authenticator app.
 # @name challenge
 POST {{baseUrl}}/2fa/challenge
 Content-Type: application/json
@@ -21,7 +21,7 @@ Accept: application/json
 Authorization: Bearer {{token}}
 
 {
-    "totp_code": "967972",
+    "totp_code": "313981",
     "action_payload": {
         "source_wallet_id": 3,
         "dest_wallet_id": 4,
